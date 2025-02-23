@@ -406,25 +406,30 @@ class FileCarvingWidget(QWidget):
             self.save_file(mov_data, 'mov', 'carved_files', mov_file_offset)
 
     def carve_jpg_files(self, chunk, offset):
-        jpg_start_signature = b'\xFF\xD8\xFF'
-        jpg_end_signature = b'\xFF\xD9'
+        pattern_ffe1 = re.compile(b'\xFF\xD8\xFF\xE1..\x45\x78\x69\x66')
+        pattern_ffe0 = re.compile(b'\xFF\xD8\xFF\xE0')
         offset = 0
         while offset < len(chunk):
-            start_index = chunk.find(jpg_start_signature, offset)
-            if start_index == -1:
+            start_index_ffe1 = pattern_ffe1.search(chunk, offset)
+            start_index_ffe0 = pattern_ffe0.search(chunk, offset)
+
+            if start_index_ffe1:
+                start_index = start_index_ffe1.start()
+            elif start_index_ffe0:
+                start_index = start_index_ffe0.start()
+            else:
                 break
 
-            end_index = chunk.find(jpg_end_signature, start_index)
+            end_index = chunk.find(b'\xFF\xD9', start_index)
             if end_index != -1:
-                jpg_content = chunk[start_index:end_index + len(jpg_end_signature)]
+                jpg_content = chunk[start_index:end_index + 2]
 
-                # Check if it's a valid JPG file
                 if self.is_valid_file(jpg_content, 'jpg'):
                     self.save_file(jpg_content, 'jpg', 'carved_files', start_index)
 
-                offset = end_index + len(jpg_end_signature)
+                offset = end_index + 2
             else:
-                offset = start_index + 1  # Continue searching
+                offset = start_index + 1
 
     def carve_gif_files(self, chunk, offset):
         gif_start_signature = b'\x47\x49\x46\x38'
